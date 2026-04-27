@@ -3,7 +3,7 @@ import json
 from openai import OpenAI
 
 from config import settings
-from src.llm_service.tools import get_from_table
+from src.llm_service import tools
 
 
 class LLMService:
@@ -14,7 +14,7 @@ class LLMService:
         
         self.TOOLS = {
             'get_from_table': {
-                'function': get_from_table,
+                'function': tools.get_from_table,
                 'schema': {
                     'type': 'function',
                     'function': {
@@ -43,9 +43,55 @@ class LLMService:
                         }
                     }
                 }
+            },
+            'restart_service': {
+                'function': tools.restart_service,
+                'schema': {
+                    'type': 'function',
+                    'function': {
+                        'name': 'restart_service',
+                        'description': 'Stop and start given service, logging given reason if provided',
+                        'parameters': {
+                            'type': 'object',
+                            'properties': {
+                                'service': {
+                                    'type': 'string',
+                                    'description': 'Name of service to restart'
+                                },
+                                'reason': {
+                                    'type': 'string',
+                                    'description': 'Reason of why service needs to be restarted. Using for logs only'
+                                }
+                            },
+                            'required': ['service'],
+                            'additionalProperties': False
+                        }
+                    }
+                }
+            },
+            'get_service_status': {
+                'function': tools.get_service_status,
+                'schema': {
+                    'type': 'function',
+                    'function': {
+                        'name': 'get_service_status',
+                        'description': 'Get current service status (running, stopped, error)',
+                        'parameters': {
+                            'type': 'object',
+                            'properties': {
+                                'service': {
+                                    'type': 'string',
+                                    'description': 'Name of service to get status'
+                                }
+                            },
+                            'required': ['service'],
+                            'additionalProperties': False
+                        }
+                    }
+                } 
             }
         }
-        print([t['schema'] for t in self.TOOLS.values()])
+        
         
         
     def get_response_from_llm(self, messages):
@@ -59,7 +105,7 @@ class LLMService:
         
         return response
         
-    def ask_llm(self, prompt='give me logs for last 5h'):
+    def ask_llm(self, prompt):
         messages = []
         messages.append({'role': 'user', 'content': prompt})
         
@@ -75,10 +121,10 @@ class LLMService:
             if finish_reason == 'stop':
                 break 
             elif finish_reason == 'tool_calls':
-                for tool in message.tool_calls:
+                for tool in message.tool_calls: # type: ignore
                     
-                    func = self.TOOLS[tool.function.name]['function']
-                    args = json.loads(tool.function.arguments)
+                    func = self.TOOLS[tool.function.name]['function'] # type: ignore
+                    args = json.loads(tool.function.arguments) # type: ignore
                     result = func(**args)
                     
                     messages.append({

@@ -1,10 +1,9 @@
-import json
-
-from openai import OpenAI, AsyncOpenAI
+from openai import AsyncOpenAI
 
 from config import settings
 from src.llm_service import tools
 from src.llm_service.schemas import Tool, GetFromTableToolSchema, GetServiceStatusToolSchema, RestartServiceToolSchema
+from src.core.sessions import session_manager
 
 
 class LLMService:
@@ -45,8 +44,17 @@ class LLMService:
         
         return response
         
-    async def ask_llm(self, prompt):
-        messages = []
+    async def ask_llm(self, prompt: str, session_id: str):
+        messages = session_manager.get_or_create(session_id)
+        
+        if not messages:
+            messages.append({
+                'role': 'system',
+                'content': '''You are DevOps assistant. 
+                When asked about past actions, look through the conversation history and tool call results — the answer is already there.
+                Do not say you lack access if the information is visible in the chat history.'''
+            })
+
         messages.append({'role': 'user', 'content': prompt})
         
         while True:
@@ -55,7 +63,7 @@ class LLMService:
             
             message = response.choices[0].message
                 
-            messages.append(message)
+            messages.append(message.model_dump(exclude_none=True))
             finish_reason = response.choices[0].finish_reason
             
             if finish_reason == 'stop':
@@ -71,6 +79,7 @@ class LLMService:
                         'content': result
                     })
         print(messages)
+        
         return message.content
                     
         

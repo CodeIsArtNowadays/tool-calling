@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, HTTPException
 
 from src.api.schemas import AskRequestSchema, AskResponseSchema
@@ -13,8 +14,12 @@ async def index():
 
 @api_router.post("/llm", response_model=AskResponseSchema)
 async def llm(request: AskRequestSchema):
+    
+    if not request.session_id:
+        request.session_id = str(uuid.uuid4())
+    
     try:
-        result = await llm_service.ask_llm(request.prompt)
-        return {'answer': result}
+        result = await llm_service.ask_llm(request.prompt, request.session_id)
+        return {'session_id': request.session_id, 'answer': result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
